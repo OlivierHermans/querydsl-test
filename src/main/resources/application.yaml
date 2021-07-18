@@ -7,3 +7,6 @@ spring:
   flyway:
     locations: classpath:db/migration
 
+logging:
+  level:
+    com.querydsl: debug
