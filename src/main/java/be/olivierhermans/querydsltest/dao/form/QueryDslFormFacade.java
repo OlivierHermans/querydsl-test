@@ -1,6 +1,5 @@
 package be.olivierhermans.querydsltest.dao.form;
 
-import be.olivierhermans.querydsltest.dao.SForm;
 import be.olivierhermans.querydsltest.model.Form;
 import be.olivierhermans.querydsltest.service.form.port.out.FormFacade;
 import com.querydsl.core.FetchableQuery;
@@ -17,9 +16,7 @@ import org.springframework.stereotype.Service;
 
 import javax.persistence.EntityManager;
 import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Supplier;
@@ -44,15 +41,15 @@ class QueryDslFormFacade implements FormFacade {
                 .partitionBy(form.clientId)
                 .orderBy(form.creationTms.desc()).as("rowNumber");
         final Supplier<QueryBase> querySupplier = () ->
-                new JPASQLQuery(entityManager, new PostgreSQLTemplates())
-                        .select(form.formId, form.clientId, form.creationTms)
-                        .from(SQLExpressions.select(form.formId, form.clientId, form.creationTms, rowNumber)
-                                .from(form).as(form))
-                        .where(Expressions.numberPath(Long.class, "rowNumber").eq(1L));
+            new JPASQLQuery(entityManager, new PostgreSQLTemplates())
+                    .select(form.formId, form.clientId, form.creationTms)
+                    .from(SQLExpressions.select(form.formId, form.clientId, form.creationTms, rowNumber)
+                            .from(form).where(form.creationTms.lt(localDateToTimestamp(LocalDate.of(2021, 7, 16)))).as(form))
+                    .where(Expressions.numberPath(Long.class, "rowNumber").eq(1L));
         final Long numberOfRecords = fetchCount(querySupplier);
         final long pageSize = 1;
 
-        return LongStream.rangeClosed(5, 8/*numberOfRecords / pageSize*/)   // test with non existing pages
+        return LongStream.rangeClosed(1, numberOfRecords / pageSize)   // test with non existing pages, returns empty list
                 .mapToObj(pageNum ->
                         fetch(querySupplier, pageNum, pageSize).stream()
                                 .map(this::mapFormTuple)
@@ -80,5 +77,9 @@ class QueryDslFormFacade implements FormFacade {
 
     private OffsetDateTime timestampToOffsetDateTime(Timestamp timestamp) {
         return OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp.getTime()), ZoneOffset.ofHours(2));
+    }
+
+    private Timestamp localDateToTimestamp(LocalDate localDate) {
+        return new Timestamp(localDate.toEpochSecond(LocalTime.of(0, 0), ZoneOffset.UTC));
     }
 }
